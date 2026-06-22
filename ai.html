@@ -668,33 +668,35 @@
             window.speechSynthesis.speak(utterance);
         }
 
-        async function sendLiveCallMessage(text) {
-            if (text.trim() === '') return;
-            
-            printMessage('user', text);
-            userChats[currentChatId].messages.push({ role: "user", text: text });
+async function sendLiveCallMessage(text) {
+    if (text.trim() === '') return;
+    
+    printMessage('user', text);
+    userChats[currentChatId].messages.push({ role: "user", text: text });
 
-            try {
-                const systemPrompt = getSystemPrompt(true);
-                const encodedPrompt = encodeURIComponent(`${systemPrompt}\nالمستخدم: ${text}`);
-                
-                const response = await fetch(`https://text.pollinations.ai/${encodedPrompt}?model=openai&cache=false`);
-                const aiResponseText = await response.text();
-                const cleanReply = aiResponseText.trim();
+    try {
+        const systemPrompt = getSystemPrompt(true);
+        const fullPrompt = `${systemPrompt}\nالمستخدم: ${text}`;
+        const encodedPrompt = encodeURIComponent(fullPrompt);
+        
+        const response = await fetch(`https://text.pollinations.ai/${encodedPrompt}?model=searchgpt&system=true`);
+        if (!response.ok) throw new Error('Network error');
+        
+        const aiResponseText = await response.text();
+        const cleanReply = aiResponseText.trim();
 
-                printMessage('bot', cleanReply);
-                userChats[currentChatId].messages.push({ role: "bot", text: cleanReply });
-                saveUserData();
-                
-                speakText(cleanReply);
+        printMessage('bot', cleanReply);
+        userChats[currentChatId].messages.push({ role: "bot", text: cleanReply });
+        saveUserData();
+        
+        speakText(cleanReply);
 
-            } catch (error) {
-                if (isCallActive && shouldKeepListening) {
-                    speakText("عذراً، أعد المحاولة.");
-                }
-            }
+    } catch (error) {
+        if (isCallActive && shouldKeepListening) {
+            speakText("عذراً حبيبي، واجهت مشكلة اتصال خفيفة. أعد الكلمة.");
         }
-
+    }
+}
         function printMessage(role, text) {
             const chatBox = document.getElementById('chatBox');
             const msgDiv = document.createElement('div');
@@ -786,48 +788,51 @@
             }
         }
 
-        async function sendMessage() {
-            const inputElement = document.getElementById('userInput');
-            const messageText = inputElement.value.trim();
-            if (messageText === '') return;
+async function sendMessage() {
+    const inputElement = document.getElementById('userInput');
+    const messageText = inputElement.value.trim();
+    if (messageText === '') return;
 
-            if (userChats[currentChatId].title === "محادثه جديده") {
-                userChats[currentChatId].title = messageText.substring(0, 22) + (messageText.length > 22 ? "..." : "");
-                renderSidebar();
-            }
+    if (userChats[currentChatId].title === "محادثه جديده") {
+        userChats[currentChatId].title = messageText.substring(0, 22) + (messageText.length > 22 ? "..." : "");
+        renderSidebar();
+    }
 
-            printMessage('user', messageText);
-            userChats[currentChatId].messages.push({ role: "user", text: messageText });
-            inputElement.value = '';
+    printMessage('user', messageText);
+    userChats[currentChatId].messages.push({ role: "user", text: messageText });
+    inputElement.value = '';
 
-            const chatBox = document.getElementById('chatBox');
-            const loadingDiv = document.createElement('div');
-            loadingDiv.className = 'message bot';
-            loadingDiv.innerText = "جاري الكتابة... ⚡";
-            chatBox.appendChild(loadingDiv);
-            chatBox.scrollTop = chatBox.scrollHeight;
+    const chatBox = document.getElementById('chatBox');
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'message bot';
+    loadingDiv.innerText = "جاري الكتابة... ⚡";
+    chatBox.appendChild(loadingDiv);
+    chatBox.scrollTop = chatBox.scrollHeight;
 
-            try {
-                const systemPrompt = getSystemPrompt(false);
-                const encodedPrompt = encodeURIComponent(`${systemPrompt}\nالمستخدم: ${messageText}`);
-                
-                const response = await fetch(`https://text.pollinations.ai/${encodedPrompt}?model=openai&cache=false`);
-                const aiResponseText = await response.text();
-                
-                if (chatBox.contains(loadingDiv)) { chatBox.removeChild(loadingDiv); }
+    try {
+        const systemPrompt = getSystemPrompt(false);
+        // التعديل هنا: دمج النص بنظام نقي ومباشر لضمان عدم حدوث مشاكل في السيرفر المجاني
+        const fullPrompt = `${systemPrompt}\nالمستخدم: ${messageText}`;
+        const encodedPrompt = encodeURIComponent(fullPrompt);
+        
+        // استخدام موديل مستقر وسريع جداً لتجنب الـ Fetch error
+        const response = await fetch(`https://text.pollinations.ai/${encodedPrompt}?model=searchgpt&system=true`);
+        
+        if (!response.ok) throw new Error('Network response was not ok');
+        const aiResponseText = await response.text();
+        
+        if (chatBox.contains(loadingDiv)) { chatBox.removeChild(loadingDiv); }
 
-                const cleanReply = aiResponseText.trim();
-                printMessage('bot', cleanReply);
-                userChats[currentChatId].messages.push({ role: "bot", text: cleanReply });
-                saveUserData();
+        const cleanReply = aiResponseText.trim();
+        printMessage('bot', cleanReply);
+        userChats[currentChatId].messages.push({ role: "bot", text: cleanReply });
+        saveUserData();
 
-            } catch (error) {
-                if (chatBox.contains(loadingDiv)) { chatBox.removeChild(loadingDiv); }
-                printMessage('error', "⚠️ حدث خطأ، يرجى إعادة المحاولة.");
-            }
-        }
-
-        function checkEnter(event) { if (event.key === 'Enter') { sendMessage(); } }
-    </script>
+    } catch (error) {
+        if (chatBox.contains(loadingDiv)) { chatBox.removeChild(loadingDiv); }
+        printMessage('error', "⚠️ السيرفر مشغول حالياً، جرب إرسال الرسالة مرة أخرى.");
+        console.error("Fetch error:", error);
+    }
+}    </script>
 </body>
 </html>
